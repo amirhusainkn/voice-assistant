@@ -1,1 +1,258 @@
+<!DOCTYPE html>
+<html lang="hi-IN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>मेरा वॉइस असिस्टेंट</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #000000;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      text-align: center;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 22px;
+      padding: 24px;
+    }
+    .status {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .online { background: #064e3b; color: #6ee7b7; }
+    .offline { background: #7f1d1d; color: #fca5a5; }
+    #clock {
+      font-size: 44px;
+      font-weight: 700;
+      margin: 6px 0;
+    }
+    #date {
+      font-size: 16px;
+      color: #d1d5db;
+      margin-bottom: 10px;
+    }
+    #battery {
+      font-size: 15px;
+      color: #38bdf8;
+      margin-bottom: 22px;
+    }
+    .mic-btn {
+      width: 100%;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      border: 1px solid #4b5563;
+      border-radius: 16px;
+      background: #ffffff;
+      color: #000000;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+    .mic-btn.listening {
+      background: #dc2626;
+      color: #ffffff;
+      border-color: #dc2626;
+    }
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .quick-btn {
+      padding: 12px 6px;
+      font-size: 13px;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      background: #1f2937;
+      color: #f9fafb;
+      cursor: pointer;
+    }
+    .log {
+      background: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      min-height: 68px;
+      text-align: left;
+      color: #e5e7eb;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="netStatus" class="status">जाँच हो रही है...</div>
+    <div id="clock">--:--:--</div>
+    <div id="date">तारीख लोड हो रही है...</div>
+    <div id="battery">बैटरी: जाँच रहे हैं...</div>
 
+    <button id="micBtn" class="mic-btn">🎤 बोलें (टाइम / तारीख / बैटरी)</button>
+
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="speakTime()">🕒 वक़्त</button>
+      <button class="quick-btn" onclick="speakDate()">📅 तारीख</button>
+      <button class="quick-btn" onclick="speakBattery()">🔋 बैटरी</button>
+    </div>
+
+    <div id="log" class="log">बटन दबाएं और बोलें: "वक़्त क्या हुआ है", "आज की तारीख", या "बैटरी कितनी है"।</div>
+  </div>
+
+  <script>
+    const clockEl = document.getElementById("clock");
+    const dateEl = document.getElementById("date");
+    const batteryEl = document.getElementById("battery");
+    const logEl = document.getElementById("log");
+    const micBtn = document.getElementById("micBtn");
+    const netStatusEl = document.getElementById("netStatus");
+
+    let latestBatteryText = "बैटरी की जानकारी अभी उपलब्ध नहीं है।";
+
+    function updateNetStatus() {
+      if (navigator.onLine) {
+        netStatusEl.textContent = "ऑनलाइन मोड";
+        netStatusEl.className = "status online";
+      } else {
+        netStatusEl.textContent = "ऑफ़लाइन मोड";
+        netStatusEl.className = "status offline";
+      }
+    }
+    window.addEventListener("online", updateNetStatus);
+    window.addEventListener("offline", updateNetStatus);
+    updateNetStatus();
+
+    function updateClockAndDate() {
+      const now = new Date();
+      clockEl.textContent = now.toLocaleTimeString("hi-IN", { hour12: true });
+      dateEl.textContent = now.toLocaleDateString("hi-IN", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+    }
+    setInterval(updateClockAndDate, 1000);
+    updateClockAndDate();
+
+    async function initBattery() {
+      if ("getBattery" in navigator) {
+        try {
+          const battery = await navigator.getBattery();
+          const refreshBattery = () => {
+            const level = Math.round(battery.level * 100);
+            const state = battery.charging ? "चार्ज हो रही है" : "चार्ज पर नहीं है";
+            batteryEl.textContent = `बैटरी: ${level}% (${state})`;
+            latestBatteryText = `अभी आपके फ़ोन की बैटरी ${level} फ़ीसदी है, और यह ${state}।`;
+          };
+          refreshBattery();
+          battery.addEventListener("levelchange", refreshBattery);
+          battery.addEventListener("chargingchange", refreshBattery);
+        } catch (e) {
+          batteryEl.textContent = "बैटरी: उपलब्ध नहीं";
+        }
+      }
+    }
+    initBattery();
+
+    function speak(text) {
+      logEl.textContent = text;
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "hi-IN";
+        utter.rate = 1.0;
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    function speakTime() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("hi-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+      speak(`अभी ${timeStr} बज रहे हैं।`);
+    }
+
+    function speakDate() {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString("hi-IN", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      speak(`आज ${dateStr} है।`);
+    }
+
+    function speakBattery() {
+      speak(latestBatteryText);
+    }
+
+    function handleCommand(rawText) {
+      const text = rawText.toLowerCase().trim();
+      logEl.textContent = `आपने फ़रमाया: "${rawText}"`;
+
+      const isTime = text.includes("टाइम") || text.includes("वक़्त") || text.includes("वक्त") || text.includes("समय") || text.includes("बजे") || text.includes("time");
+      const isDate = text.includes("तारीख") || text.includes("डेट") || text.includes("आज") || text.includes("दिन") || text.includes("date");
+      const isBattery = text.includes("बैटरी") || text.includes("चार्ज") || text.includes("battery") || text.includes("charge");
+
+      if (isTime && !isDate && !isBattery) {
+        speakTime();
+      } else if (isDate && !isTime) {
+        speakDate();
+      } else if (isBattery) {
+        speakBattery();
+      } else {
+        speak("मैंने सुना: " + rawText + "। बराह-ए-करम वक़्त, तारीख या बैटरी के बारे में पूछें।");
+      }
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "hi-IN";
+      recognition.interimResults = false;
+
+      micBtn.addEventListener("click", () => {
+        try { recognition.start(); } catch (e) { recognition.stop(); }
+      });
+
+      recognition.onstart = () => {
+        micBtn.textContent = "🎙️ सुन रहा हूँ... बोलिए";
+        micBtn.classList.add("listening");
+      };
+
+      recognition.onresult = (event) => {
+        handleCommand(event.results[0][0].transcript);
+      };
+
+      recognition.onerror = (event) => {
+        micBtn.textContent = "🎤 बोलें (टाइम / तारीख / बैटरी)";
+        micBtn.classList.remove("listening");
+        logEl.textContent = `आवाज़ सुनने में दिक्कत आई (${event.error})। नीचे दिए गए बटन भी इस्तेमाल कर सकते हैं।`;
+      };
+
+      recognition.onend = () => {
+        micBtn.textContent = "🎤 बोलें (टाइम / तारीख / बैटरी)";
+        micBtn.classList.remove("listening");
+      };
+    } else {
+      micBtn.disabled = true;
+      micBtn.textContent = "माइक उपलब्ध नहीं है";
+    }
+  </script>
+</body>
+</html>
